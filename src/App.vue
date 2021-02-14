@@ -48,7 +48,7 @@
           <div
             v-for="t of tickers"
             :key="t.name"
-            @click="selected = t"
+            @click="selectTicker(t)"
             :class="{
               'border-purple-800': selected === t
             }"
@@ -90,10 +90,12 @@
           {{ selected.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
-          <div class="bg-purple-800 border w-10 h-24"></div>
-          <div class="bg-purple-800 border w-10 h-32"></div>
-          <div class="bg-purple-800 border w-10 h-48"></div>
-          <div class="bg-purple-800 border w-10 h-16"></div>
+          <div
+            v-for="(bar, idx) in normalizeGraph()"
+            :key="idx"
+            :style="{ height: `${bar}%` }"
+            class="bg-purple-800 border w-10"
+          ></div>
         </div>
         <button
           @click="selected = null"
@@ -133,9 +135,10 @@ export default {
 
   data() {
     return {
-      ticker: null,
+      ticker: "",
       tickers: [],
-      selected: null
+      selected: null,
+      graph: []
     };
   },
 
@@ -147,7 +150,27 @@ export default {
       };
 
       this.tickers.push(newTicker);
+
+      setInterval(async () => {
+        const response = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${newTicker.name}&tsyms=USD&api_key=255345b81452facc21690e769c54632cf034c12c6a591e51343fb95178428193`
+        );
+        const data = await response.json();
+
+        this.tickers.find(t => t.name === newTicker.name).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+
+        if (this.selected?.name === newTicker.name) {
+          this.graph.push(data.USD);
+        }
+      }, 3000);
+
       this.clearTickerInput();
+    },
+
+    selectTicker(selector) {
+      this.selected = selector;
+      this.graph = [];
     },
 
     deleteTicker(tickerToDelete) {
@@ -157,6 +180,17 @@ export default {
 
     clearTickerInput() {
       this.ticker = null;
+    },
+
+    normalizeGraph() {
+      const minValue = Math.min(...this.graph);
+      const maxValue = Math.max(...this.graph);
+
+      return this.graph.map(bar =>
+        minValue === maxValue
+          ? 50
+          : 5 + ((bar - minValue) * 95) / (maxValue - minValue)
+      );
     }
   }
 };
